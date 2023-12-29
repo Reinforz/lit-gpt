@@ -5,6 +5,7 @@ import json
 DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1108425291552010251/K5z6vd1Z9XG5HDgCWMyEB4_-H-E1-g3iikzC_rV7UmSnFqD-xcDZCmecOTjg_GcJctr0'
 
 def send_embedded_message(description: str, statsMessage: str, timeMessage:str):
+  try:
 
     headers = {
         'Content-Type': 'application/json',
@@ -33,6 +34,6 @@ def send_embedded_message(description: str, statsMessage: str, timeMessage:str):
         print("Embedded message sent successfully")
     else:
         print(f"Failed to send embedded message. Status code: {response.status_code}")
-
-
+  except:
+    pass
 

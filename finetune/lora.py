@@ -247,7 +247,8 @@ def train(
 
         if not is_accumulating:
             # LOG to discord here
-            send_embedded_message("Training", f"iter {iter_num} step {step_count}: loss {loss_item:.4f}, iter time:",  f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}")
+            t1 = time.perf_counter()
+            send_embedded_message("Training Eval", f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:",  f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}")
             optimizer.step()
             optimizer.zero_grad()
             if step_count > warmup_steps:

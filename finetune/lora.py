@@ -27,6 +27,8 @@ from lit_gpt.utils import (
 )
 from scripts.prepare_alpaca import generate_prompt
 
+from utils.discord import send_embedded_message
+
 eval_interval = 100
 save_interval = 100
 eval_iters = 100
@@ -244,6 +246,8 @@ def train(
             fabric.backward(loss / gradient_accumulation_iters)
 
         if not is_accumulating:
+            # LOG to discord here
+            send_embedded_message("Training", f"iter {iter_num} step {step_count}: loss {loss_item:.4f}, iter time:",  f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}")
             optimizer.step()
             optimizer.zero_grad()
             if step_count > warmup_steps:

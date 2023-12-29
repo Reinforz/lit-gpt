@@ -284,6 +284,8 @@ def train(
         if not is_accumulating and step_count % save_interval == 0:
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
+    
+    send_embedded_message("Training Complete", f"Complete", f"Complete")
 
 
 # FSDP has issues with `inference_mode`

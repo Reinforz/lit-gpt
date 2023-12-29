@@ -4,7 +4,7 @@ import json
 # Replace 'YOUR_WEBHOOK_URL' with the actual URL of your Discord webhook
 DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1108425291552010251/K5z6vd1Z9XG5HDgCWMyEB4_-H-E1-g3iikzC_rV7UmSnFqD-xcDZCmecOTjg_GcJctr0'
 
-def send_embedded_message(description: str, statsMessage: Dict):
+def send_embedded_message(description: str, statsMessage: str):
   try:
 
     headers = {

@@ -221,6 +221,7 @@ def train(
 
     throughput = ThroughputMonitor(fabric, window_size=50)
     step_count = 0
+    loss_now = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
 
@@ -246,14 +247,14 @@ def train(
             fabric.backward(loss / gradient_accumulation_iters)
 
         if not is_accumulating:
-            # LOG to discord here
-            t1 = time.perf_counter()
-            send_embedded_message("Training Eval", f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, iter time:",  f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}")
             optimizer.step()
             optimizer.zero_grad()
             if step_count > warmup_steps:
                 scheduler.step()
             step_count += 1
+            # LOG to discord here
+            send_embedded_message("Training Eval", f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss_now - loss.item():.4f}")
+            loss_now = loss.item()
 
         total_lengths += input_ids.numel()
         if iter_num % log_interval == 0:
@@ -285,7 +286,7 @@ def train(
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
     
-    send_embedded_message("Training Complete", f"Complete", f"Complete")
+    send_embedded_message("<@&1003310590753788075> Training Complete", f"Eval training")
 
 
 # FSDP has issues with `inference_mode`

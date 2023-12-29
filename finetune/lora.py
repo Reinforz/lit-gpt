@@ -286,7 +286,7 @@ def train(
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
     
-    send_embedded_message("<@&1003310590753788075> Training Complete", f"Eval training")
+    send_embedded_message("Training Complete", f"Eval training", mentionTeam=True)
 
 
 # FSDP has issues with `inference_mode`

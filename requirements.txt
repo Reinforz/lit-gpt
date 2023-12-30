@@ -3,3 +3,4 @@ lightning @ git+https://github.com/Lightning-AI/lightning@6dfa5cca9de5c28548eef5
 jsonargparse[signatures]  # CLI
 wandb
 huggingface_hub
+datasets

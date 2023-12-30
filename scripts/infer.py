@@ -1,0 +1,242 @@
+import sys
+import os
+import time
+from typing import List, Optional, Literal
+from pathlib import Path
+import json
+
+import lightning as L
+import torch
+from lightning.fabric.plugins import BitsandbytesPrecision
+
+from generate.base import generate
+from lit_gpt import Tokenizer
+from lit_gpt.lora import GPT, Config, merge_lora_weights
+from lit_gpt.utils import (
+    check_valid_checkpoint_dir,
+    gptq_quantization,
+    lazy_load,
+)
+from scripts.prepare_alpaca import generate_prompt
+
+from datasets import Dataset
+from huggingface_hub import login, HfApi
+
+lora_r = 8
+lora_alpha = 16
+lora_dropout = 0.1
+lora_query = True
+lora_key = True
+lora_value = True
+lora_projection = True
+lora_mlp = True
+lora_head = True
+
+
+def infer(test_data: Path):
+    token = os.getenv("HUGGINGFACE_TOKEN")
+    login(token=token)
+
+    api = HfApi()
+
+    models = []
+
+    with open(test_data, "r", encoding="utf-8") as file:
+        data = json.load(file)
+
+    results = [{} for sample in data]  # list of dicts
+    # [{input: str, model_name1: str, model_name2: str, ...}]
+
+    for model_path in models:
+        model, tokenizer, fabric, max_return_token = setup_model(
+            lora_path=Path(model),
+            checkpoint_dir=model_path,
+            quantize="bnb.nf4",
+            max_new_tokens=500,
+            precision="bf16-true",
+            data=data,
+        )
+        for i, sample in enumerate(data):
+            output = infer_sample(
+                prompt=sample["instruction"],
+                input=sample["input"],
+                max_returned_tokens=max_return_token,
+                tokenizer=tokenizer,
+                model=model,
+                fabric=fabric,
+                top_k=200,
+                temperature=0.8,
+            )
+            results[i][model_path] = output
+            if i % 25 == 0:
+                with open("inference/inference.json", "w", encoding="utf-8") as file:
+                    json.dump(results, file)
+                api.upload_file(
+                    path_or_fileobj="inference/inference.json",
+                    path_in_repo="inference.json",
+                    repo_id="reinforz/inference-results",
+                    repo_type="dataset",
+                )
+        # delete model
+        del model, tokenizer, fabric
+
+
+def infer_sample(
+    prompt: str,
+    input: str,
+    max_returned_tokens: int,
+    tokenizer: Tokenizer,
+    model: GPT,
+    fabric: L.Fabric,
+    top_k: int = 200,
+    temperature: float = 0.8,
+):
+    sample = {"instruction": prompt, "input": input}
+    prompt = generate_prompt(sample)
+    encoded = tokenizer.encode(prompt, device=fabric.device)
+    prompt_length = encoded.size(0)
+    # max_returned_tokens = prompt_length + max_new_tokens
+
+    L.seed_everything(1234)
+    t0 = time.perf_counter()
+    y = generate(
+        model,
+        encoded,
+        max_returned_tokens,
+        temperature=temperature,
+        top_k=top_k,
+        eos_id=tokenizer.eos_id,
+    )
+    t = time.perf_counter() - t0
+
+    output = tokenizer.decode(y)
+    output = output.split("### Response:")[1].strip()
+    # fabric.print(output)
+
+    tokens_generated = y.size(0) - prompt_length
+    fabric.print(
+        f"\n\nTime for inference: {t:.02f} sec total, {tokens_generated / t:.02f} tokens/sec",
+        file=sys.stderr,
+    )
+    if fabric.device.type == "cuda":
+        fabric.print(
+            f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB",
+            file=sys.stderr,
+        )
+
+    return output
+
+
+def setup_model(
+    lora_path: Path,
+    checkpoint_dir: Path,
+    quantize: Optional[
+        Literal[
+            "bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8", "gptq.int4"
+        ]
+    ],
+    max_new_tokens: int,
+    top_k: int,
+    temperature: float,
+    precision: str,
+    data: List[dict],
+):
+    """Generates a response based on a given instruction and an optional input."""
+    # precision = precision or get_default_supported_precision(training=False)
+
+    plugins = None
+    if quantize is not None and quantize.startswith("bnb."):
+        if "mixed" in precision:
+            raise ValueError("Quantization and mixed precision is not supported.")
+        dtype = {
+            "16-true": torch.float16,
+            "bf16-true": torch.bfloat16,
+            "32-true": torch.float32,
+        }[precision]
+        plugins = BitsandbytesPrecision(quantize[4:], dtype)
+        precision = None
+
+    fabric = L.Fabric(devices=1, precision=precision, plugins=plugins)
+    fabric.launch()
+
+    check_valid_checkpoint_dir(checkpoint_dir)
+
+    config = Config.from_json(
+        checkpoint_dir / "lit_config.json",
+        r=lora_r,
+        alpha=lora_alpha,
+        dropout=lora_dropout,
+        to_query=lora_query,
+        to_key=lora_key,
+        to_value=lora_value,
+        to_projection=lora_projection,
+        to_mlp=lora_mlp,
+        to_head=lora_head,
+    )
+
+    if quantize == "gptq.int4":
+        model_file = "lit_model_gptq.4bit.pth"
+        if not (checkpoint_dir / model_file).is_file():
+            raise ValueError("Please run `python quantize/gptq.py` first")
+    else:
+        model_file = "lit_model.pth"
+    checkpoint_path = checkpoint_dir / model_file
+
+    tokenizer = Tokenizer(checkpoint_dir)
+
+    fabric.print(
+        f"Loading model {str(checkpoint_path)!r} with {config.__dict__}",
+        file=sys.stderr,
+    )
+    t0 = time.perf_counter()
+    with fabric.init_module(empty_init=True), gptq_quantization(
+        quantize == "gptq.int4"
+    ):
+        model = GPT(config)
+    fabric.print(
+        f"Time to instantiate model: {time.perf_counter() - t0:.02f} seconds.",
+        file=sys.stderr,
+    )
+
+    max_returned_tokens = get_max_length(data, tokenizer, max_new_tokens, fabric)
+
+    with fabric.init_tensor():
+        # set the max_seq_length to limit the memory usage to what we need
+        model.max_seq_length = max_returned_tokens
+        # enable the kv cache
+        model.set_kv_cache(batch_size=1)
+    model.eval()
+
+    t0 = time.perf_counter()
+    checkpoint = lazy_load(checkpoint_path)
+    lora_checkpoint = lazy_load(lora_path)
+    checkpoint.update(lora_checkpoint.get("model", lora_checkpoint))
+    model.load_state_dict(checkpoint)
+    fabric.print(
+        f"Time to load the model weights: {time.perf_counter() - t0:.02f} seconds.",
+        file=sys.stderr,
+    )
+
+    merge_lora_weights(model)
+    model = fabric.setup(model)
+
+    return model, tokenizer, fabric, max_returned_tokens
+
+
+def get_max_length(
+    data: List[dict], tokenizer: Tokenizer, max_new_tokens: int, fabric: L.Fabric
+) -> int:
+    max_seq_length = 0
+    for sample in data:
+        instruction = sample["instruction"]
+        user_input = sample["input"]
+        prompt_dict = {
+            "instruction": instruction,
+            "input": user_input,
+        }
+        prompt = generate_prompt(prompt_dict)
+        encoded = tokenizer.encode(prompt, device=fabric.device)
+        prompt_length = encoded.size(0)
+        max_returned_tokens = prompt_length + max_new_tokens
+        max_seq_length = max(max_seq_length, max_returned_tokens)
+    return max_seq_length

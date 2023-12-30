@@ -36,7 +36,7 @@ from utils.discord import send_embedded_message
 wandb.login()
 
 # Training settings
-eval_interval = 25
+eval_interval = 10
 save_interval = 10
 eval_iters = 100
 eval_max_new_tokens = 350

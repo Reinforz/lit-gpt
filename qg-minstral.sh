@@ -8,6 +8,7 @@ cd workspace
 mkdir $dir_name
 cd $dir_name
 git clone https://github.com/Reinforz/lit-gpt .
+git pull
 pip install -r requirements-all.txt
 python scripts/download.py \
   --repo_id $hf_repo_author/$hf_repo_name

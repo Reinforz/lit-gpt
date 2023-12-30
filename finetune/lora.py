@@ -33,9 +33,6 @@ from lit_gpt.utils import (
 from scripts.prepare_alpaca import generate_prompt
 from utils.discord import send_embedded_message
 
-# set up wandb... ensure WANDB_API_KEY env variable is set
-wandb.login()
-
 # Training settings
 eval_interval = 10
 save_interval = 10
@@ -75,6 +72,8 @@ HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 login(token=HUGGINGFACE_TOKEN)
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 WANDB_PROJECT = os.getenv("WANDB_PROJECT")
+# set up wandb... ensure WANDB_API_KEY env variable is set
+wandb.login()
 
 
 def setup(
@@ -243,6 +242,8 @@ def main(
     except Exception as e:
         error_message = str(e)
         stack_trace = traceback.format_exc()
+        fabric.print(e)
+        fabric.print(stack_trace)
         send_embedded_message(
             f"Training Error: {repo_id}",
             {
@@ -300,6 +301,7 @@ def train(
     output_logged_text.append(
         [
             0,
+            prompts[0],
             outputs[0],
             prompts[1],
             outputs[1],
@@ -458,7 +460,6 @@ def validate(
 
     # produce an example:
     instruction = "Instructions: Evaluate the answer of the following question. Give a score in terms of relevance, coherence and grammar and explanation of for the evaluation. Please structure your response as follows:\n1. Begin with the 'Answer Evaluation' section, offering an in-depth review and analysis of the student's answer with respect to the given evaluation criteria.\n2. Follow this with a whole number numerical score for relevance (out of 6), coherence (out of 2), and grammar & spelling (out of 2) for the student's answer. Each score should be listed on a new line, preceded by its respective category."
-    fabric.print(instruction)
 
     prompts = []
     outputs = []
@@ -482,12 +483,11 @@ def validate(
         )
         model.clear_kv_cache()
         output = tokenizer.decode(output)
-        fabric.print(output)
         prompts.append(prompt)
         outputs.append(output)
 
     model.train()
-    return val_loss, prompt, output
+    return val_loss, prompts, outputs
 
 
 def get_batch(

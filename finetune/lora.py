@@ -255,8 +255,8 @@ def train(
         f" {model.max_seq_length} and context length is {model.config.block_size}"
     )
 
-    val_loss, prompt, output = validate(
-        fabric, model, val_data, tokenizer, max_iters=2
+    val_loss, prompts, outputs = validate(
+        fabric, model, val_data, tokenizer, iters=2
     )  # sanity check
 
     throughput = ThroughputMonitor(fabric, window_size=50)
@@ -264,11 +264,32 @@ def train(
     loss_prev = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
-    columns = ["step_num", "prompt", "output"]
+    columns = [
+        "step_num",
+        "prompt (poor)",
+        "output (poor)",
+        "prompt (average)",
+        "output (average)",
+        "prompt (good)",
+        "output (good)",
+        "prompt (excellent)",
+        "output (excellent)",
+    ]
     output_logged_text = []
 
     # save instruction and output to wandb table
-    output_logged_text.append([0, prompt, output])
+    output_logged_text.append(
+        [
+            0,
+            outputs[0],
+            prompts[1],
+            outputs[1],
+            prompts[2],
+            outputs[2],
+            prompts[3],
+            outputs[3],
+        ]
+    )
 
     wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
 
@@ -330,12 +351,24 @@ def train(
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.perf_counter()
-            val_loss, prompt, output = validate(
-                fabric, model, val_data, tokenizer, max_iters=eval_iters
+            val_loss, prompts, outputs = validate(
+                fabric, model, val_data, tokenizer, iters=eval_iters
             )
             wandb.log({"val_loss": val_loss, "train_step": step_count})
             # save instruction and output to wandb table
-            output_logged_text.append([step_count, prompt, output])
+            output_logged_text.append(
+                [
+                    step_count,
+                    prompts[0],
+                    outputs[0],
+                    prompts[1],
+                    outputs[1],
+                    prompts[2],
+                    outputs[2],
+                    prompts[3],
+                    outputs[3],
+                ]
+            )
             wandb_logger.log_text(
                 key="val_examples", columns=columns, data=output_logged_text
             )
@@ -350,7 +383,6 @@ def train(
                     "step": f"{iter_num}",
                     "val loss": f"{val_loss.item():.4f}",
                     "val time": f"{t1 * 1000:.2f}ms",
-                    "Output": f"{output}",
                 },
             )
             fabric.barrier()
@@ -365,8 +397,20 @@ def train(
             )
 
     send_embedded_message(
-        f"Training Complete: {repo_id}", f"Eval training", mentionTeam=True
+        f"Training Complete: {repo_id}", "Eval training", mentionTeam=True
     )
+
+
+sample_inputs = [
+    # Poor
+    "Question: What are the key principles and challenges in conducting clinical trials for new drugs in the field of clinical pharmacology?\nEvaluation Criteria: Identification and discussion of key principles in clinical trials for new drugs\nAnalysis of challenges faced in conducting clinical trials\nDemonstration of understanding of the field of clinical pharmacology\nCoherence and clarity of argumentation\nAccuracy of information\nGrammar and spelling\nAnswer: Clinical pharmacology is when you study drugs and how they work in people. There are challenges like finding enough people for the trials and making sure the drug is safe. The principles are like making sure the drug works and is better than what's already out there. It's important to test on different kinds of people and record the results. Sometimes people get side effects.",
+    # Average
+    "Question: Explain how the integumentary system plays a crucial role in maintaining the body's homeostasis. Include the specific mechanisms and processes involved.\nEvaluation Criteria: The answer should clearly explain the concept of homeostasis and the integumentary system.\nThe answer should accurately describe the different roles played by the integumentary system in maintaining homeostasis, including temperature regulation, protection against harmful microbes, and sensation.\nThe answer should elucidate the mechanisms involved in these roles, such as how sweat glands help regulate body temperature, how the skin acts as a barrier, and how nerve endings allow for sensation.\nThe answer should be coherent and logically structured, with appropriate use of anatomical vocabulary.\nThe answer should be grammatically correct, without spelling or punctuation errors.\nAnswer: The integumentary system is really important for our body to keep everything balanced. It is made up of our skin, hair, and nails. When we are hot, we sweat and the sweat makes us cool down. The skin also keeps bad things like bacteria out of our body. And our skin also feels things like heat and cold.",
+    # Good
+    "Question: Explain how the process of gluconeogenesis differs from glycolysis and discuss its significance in human metabolism.\nEvaluation Criteria: The response should correctly define both gluconeogenesis and glycolysis and highlight the key differences between these two metabolic pathways.\nThe answer should discuss the crucial enzymes involved in each process, highlighting those specific to gluconeogenesis and glycolysis.\nIt should explain the significance of gluconeogenesis in maintaining glucose homeostasis in the body, particularly during fasting or starvation.\nThe student's reasoning should be logically structured, with a coherent flow from one point to the next.\nThe language should be scientifically accurate, employing appropriate biochemistry terminology.\nGrammatical correctness and spelling accuracy are also essential.\nAnswer: Gluconeogenesis and glycolysis are processes that our body uses to manage our blood sugar. Gluconeogenesis is when our body makes glucose from other things that aren't carbohydrates, like proteins or lipids. Glycolysis is when our body breaks down glucose for energy. They're important because they help our body keep our blood sugar levels stable. If we didn't have gluconeogenesis, we wouldn't be able to keep our blood sugar stable when we're not eating.",
+    # Excellent
+    "Question: How do nanosensors significantly contribute to the field of nanotechnology and what potential future advancements could further enhance their functionality?\nEvaluation Criteria: The answer should clearly define what nanosensors are and provide information about their role in nanotechnology.\nThe response should provide specific examples of how nanosensors have contributed to advances in nanotechnology.\nThe student should discuss potential enhancements to nanosensor functionality that could be made in the future.\nThe argument should be logically structured and well-articulated, progressing from the definition and role of nanosensors, to their contributions, and finally to future possibilities.\nThe answer should be free of spelling and grammatical errors.\nAnswer: Nanosensors are devices that use the unique properties of nanomaterials and nanoparticles to detect and measure phenomena on the nanoscale. They play a crucial role in nanotechnology by providing data about nanoscale objects and processes that are invaluable for research and development. One of the notable contributions of nanosensors in nanotechnology is in the area of medical diagnostics. For example, nanosensors can detect disease biomarkers at very early stages, allowing for prompt treatment. Furthermore, nanosensors have paved the way for advancements in environmental monitoring, where they can detect pollutants at minute concentrations, contributing to improved environmental protection efforts. Looking to the future, nanosensors could be enhanced through the integration of machine learning algorithms. These algorithms could help in predicting patterns and making sense of the vast amount of data generated. Similarly, the development of more robust and versatile nanomaterials could lead to nanosensors with increased sensitivity and specificity. This would further expand their potential applications across various fields, from healthcare to environmental protection, and beyond.",
+]
 
 
 # FSDP has issues with `inference_mode`
@@ -376,12 +420,12 @@ def validate(
     model: GPT,
     val_data: List[Dict],
     tokenizer: Tokenizer,
-    max_iters: int,
-) -> Tuple[torch.Tensor, str, str]:
+    iters: int,
+) -> Tuple[torch.Tensor, List[str], List[str]]:
     fabric.print("Validating ...")
     model.eval()
-    losses = torch.zeros(max_iters)
-    for k in range(max_iters):
+    losses = torch.zeros(iters)
+    for k in range(iters):
         input_ids, targets = get_batch(fabric, val_data)
         if input_ids.shape[1] > model.max_seq_length:
             input_ids = input_ids[:, : model.max_seq_length]
@@ -394,27 +438,34 @@ def validate(
     val_loss = losses.mean()
 
     # produce an example:
-    instruction = "Instructions: Evaluate the answer of the following question. Give a score in terms of relevence, coherene and grammar and explanation of for the evaluation. Please structure your response as follows:\n1. Begin with the 'Answer Evaluation' section, offering an in-depth review and analysis of the student's answer with respect to the given evaluation criteria.\n2. Follow this with a whole number numerical score for relevance (out of 6), coherence (out of 2), and grammar & spelling (out of 2) for the student's answer. Each score should be listed on a new line, preceded by its respective category."
+    instruction = "Instructions: Evaluate the answer of the following question. Give a score in terms of relevance, coherence and grammar and explanation of for the evaluation. Please structure your response as follows:\n1. Begin with the 'Answer Evaluation' section, offering an in-depth review and analysis of the student's answer with respect to the given evaluation criteria.\n2. Follow this with a whole number numerical score for relevance (out of 6), coherence (out of 2), and grammar & spelling (out of 2) for the student's answer. Each score should be listed on a new line, preceded by its respective category."
     fabric.print(instruction)
-    sample = {
-        "instruction": instruction,
-        "input": "Question: How does the concept of plant disease epidemiology contribute to understanding the spread and control of plant diseases? Discuss its implications for the future of sustainable agriculture.\nEvaluation Criteria: The answer should correctly define and explain the concept of plant disease epidemiology and how it is used to study the spread and control of plant diseases.\nThe answer should discuss the implications of plant disease epidemiology for sustainable agriculture, including how it can help prevent disease outbreaks, reduce reliance on chemical pesticides, and promote biodiversity.\nThe answer should demonstrate an understanding of the challenges and limitations of plant disease epidemiology, such as predicting disease spread in the face of climate change and evolving pathogen populations.\nThe answer should be clear, coherent, and logically structured, with an introduction outlining the main points to be discussed, a body where each point is elaborated upon in detail, and a conclusion summarizing the key takeaways.\nThe answer should be grammatically correct and free of spelling mistakes.\nAnswer: Plant disease epidemiology helps us figure out how diseases in plants spread. It's a useful tool because it can guide us on how to prevent or control these diseases. Agriculture could benefit from epidemiology because it can help farmers reduce their use of chemicals. However, there are challenges, such as predicting disease spread in changing climates.",
-    }
-    prompt = generate_prompt(sample)
-    encoded = tokenizer.encode(prompt, device=fabric.device)
-    with fabric.init_tensor():
-        # do not set `max_seq_length=max_returned_token` because memory is not a concern here
-        model.set_kv_cache(batch_size=1)
-    output = generate(
-        model,
-        encoded,
-        max_returned_tokens=len(encoded) + eval_max_new_tokens,
-        temperature=0.8,
-        eos_id=tokenizer.eos_id,
-    )
-    model.clear_kv_cache()
-    output = tokenizer.decode(output)
-    fabric.print(output)
+
+    prompts = []
+    outputs = []
+
+    for sample_input in sample_inputs:
+        sample = {
+            "instruction": instruction,
+            "input": sample_input,
+        }
+        prompt = generate_prompt(sample)
+        encoded = tokenizer.encode(prompt, device=fabric.device)
+        with fabric.init_tensor():
+            # do not set `max_seq_length=max_returned_token` because memory is not a concern here
+            model.set_kv_cache(batch_size=1)
+        output = generate(
+            model,
+            encoded,
+            max_returned_tokens=len(encoded) + eval_max_new_tokens,
+            temperature=0.8,
+            eos_id=tokenizer.eos_id,
+        )
+        model.clear_kv_cache()
+        output = tokenizer.decode(output)
+        fabric.print(output)
+        prompts.append(prompt)
+        outputs.append(output)
 
     model.train()
     return val_loss, prompt, output

@@ -261,7 +261,7 @@ def train(
 
     throughput = ThroughputMonitor(fabric, window_size=50)
     step_count = 0
-    loss_now = 1
+    loss_prev = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
     columns = ["step_num", "instruction", "output"]
@@ -303,9 +303,10 @@ def train(
             # LOG to discord here
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss.item() - loss_now:.4f}",
+                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss.item() - loss_prev:.4f}",
             )
-            loss_now = loss.item()
+            wandb.log({"train_loss": loss.item(), "train_step": step_count})
+            loss_prev = loss.item()
 
         total_lengths += input_ids.numel()
         if iter_num % log_interval == 0:
@@ -322,7 +323,6 @@ def train(
                 f"iter {iter_num} step {step_count}: loss {loss_item:.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
-            wandb.log({"train_loss": loss.item(), "train_step": step_count})
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.perf_counter()

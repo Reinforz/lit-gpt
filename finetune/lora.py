@@ -69,6 +69,12 @@ hparams = {
     if isinstance(v, (int, float, str)) and not k.startswith("_")
 }
 
+# Hugging Face Hub login
+HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
+login(token=HUGGINGFACE_TOKEN)
+WANDB_API_KEY = os.getenv("WANDB_API_KEY")
+WANDB_PROJECT = os.getenv("WANDB_PROJECT")
+
 
 def setup(
     data_dir: Path = Path("data/alpaca"),
@@ -81,7 +87,7 @@ def setup(
     repo_id: str = "models/model",
 ) -> None:
     wandb_logger = WandbLogger(
-        project="thesis-subjective-question-evaluation",
+        project=WANDB_PROJECT,
         **{"config": hparams},
         name=f"{repo_id}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
     )
@@ -198,9 +204,6 @@ def main(
     # strict=False because missing keys due to LoRA weights not contained in state dict
     load_checkpoint(fabric, model, checkpoint_path, strict=False)
 
-    # Hugging Face Hub login
-    token = os.getenv("HUGGINGFACE_TOKEN")
-    login(token=token)
     api = HfApi()
 
     fabric.seed_everything(1337 + fabric.global_rank)
@@ -525,4 +528,18 @@ if __name__ == "__main__":
 
     from jsonargparse import CLI
 
+    if not HUGGINGFACE_TOKEN:
+        raise ValueError(
+            "Please set the HUGGINGFACE_TOKEN environment variable to your Hugging Face API token."
+        )
+
+    if not WANDB_API_KEY:
+        raise ValueError(
+            "Please set the WANDB_API_KEY environment variable to your Weights & Biases API key."
+        )
+
+    if not WANDB_PROJECT:
+        raise ValueError(
+            "Please set the WANDB_PROJECT environment variable to your Weights & Biases project name."
+        )
     CLI(setup)

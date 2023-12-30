@@ -240,3 +240,7 @@ def get_max_length(
         max_returned_tokens = prompt_length + max_new_tokens
         max_seq_length = max(max_seq_length, max_returned_tokens)
     return max_seq_length
+
+
+if __name__ == "__main__":
+    infer(Path("inference/test_data.json"))

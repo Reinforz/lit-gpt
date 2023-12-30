@@ -302,7 +302,7 @@ def train(
             # LOG to discord here
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss.item() - loss_prev:.4f}",
+                {"iteration":f"{iter_num}", "step":f"{step_count}", "loss":f"{loss.item():.4f}", "loss_diff": f"{loss.item() - loss_prev:.4f}"},
             )
             wandb.log({"train_loss": loss.item(), "train_step": step_count})
             loss_prev = loss.item()
@@ -341,7 +341,7 @@ def train(
             # LOG to discord validation loss
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms\nOutput:\n {output}",
+                {"step": f"{iter_num}","val loss":f"{val_loss.item():.4f}", "val time": f"{t1 * 1000:.2f}ms","Output":f"{output}"}
             )
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:

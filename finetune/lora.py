@@ -346,7 +346,7 @@ def train(
             )
             # LOG to discord validation loss
             send_embedded_message(
-                "Training Eval",
+                f"Training Eval: {repo_id}",
                 f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms",
             )
             fabric.barrier()

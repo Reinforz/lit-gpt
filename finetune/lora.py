@@ -243,6 +243,8 @@ def main(
     except Exception as e:
         error_message = str(e)
         stack_trace = traceback.format_exc()
+        fabric.print(e)
+        fabric.print(stack_trace)
         send_embedded_message(
             f"Training Error: {repo_id}",
             {
@@ -482,12 +484,11 @@ def validate(
         )
         model.clear_kv_cache()
         output = tokenizer.decode(output)
-        fabric.print(output)
         prompts.append(prompt)
         outputs.append(output)
 
     model.train()
-    return val_loss, prompt, output
+    return val_loss, prompts, outputs
 
 
 def get_batch(

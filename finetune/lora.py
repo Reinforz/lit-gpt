@@ -3,6 +3,7 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple
+from datetime import datetime
 
 import lightning as L
 import torch
@@ -70,10 +71,6 @@ hparams = {
     if isinstance(v, (int, float, str)) and not k.startswith("_")
 }
 
-wandb_logger = WandbLogger(
-    project="thesis-subjective-question-evaluation", **{"config": hparams}
-)
-
 
 def setup(
     data_dir: Path = Path("data/alpaca"),
@@ -85,6 +82,14 @@ def setup(
     ] = None,
     repo_id: Optional[Path] = "models/model",
 ) -> None:
+    os.environ[
+        "WANDB_NAME"
+    ] = f"{repo_id}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
+
+    wandb_logger = WandbLogger(
+        project="thesis-subjective-question-evaluation", **{"config": hparams}
+    )
+
     precision = precision or get_default_supported_precision(training=True)
 
     plugins = None
@@ -126,7 +131,7 @@ def setup(
         plugins=plugins,
     )
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, repo_id)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, repo_id, wandb_logger)
 
 
 def main(
@@ -135,6 +140,7 @@ def main(
     checkpoint_dir: Path,
     out_dir: Path,
     repo_id: Path,
+    wandb_logger: WandbLogger,
 ) -> None:
     check_valid_checkpoint_dir(checkpoint_dir)
 
@@ -215,6 +221,7 @@ def main(
         out_dir,
         repo_id,
         api,
+        wandb_logger,
     )
     fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
     if fabric.device.type == "cuda":
@@ -242,6 +249,7 @@ def train(
     out_dir: Path,
     repo_id: Path,
     api: HfApi,
+    wandb_logger: WandbLogger,
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     longest_seq_length, longest_seq_ix = get_longest_seq_length(train_data)

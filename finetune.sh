@@ -1,4 +1,4 @@
-hf_repo="mistralai/Mistral-7B-Instruct-v0.1"
+hf_repo="tiiuae/falcon-7b"
 # https://cdn.discordapp.com/attachments/1003310779157725194/1190165631086120960/data.json for qg data
 # https://cdn.discordapp.com/attachments/833018351009529856/1189824144754352188/data.json for eval data
 data_file_url="https://cdn.discordapp.com/attachments/1003310779157725194/1190563478814072892/train.json"
@@ -16,4 +16,4 @@ python scripts/prepare_alpaca.py \
 # python finetune/lora.py \
 #   --checkpoint_dir checkpoints/$hf_repo/ --precision bf16-true --quantize "bnb.nf4" --data_dir . --out_dir out --repo_id reinforz/falcon7b-instruct-lora-nf4-subj-eval
 python finetune/adapter_v2.py \
-  --checkpoint_dir checkpoints/$hf_repo/ --precision bf16-true --data_dir . --out_dir out --repo_id reinforz/mistral7b-instruct-adapterv2-nf4-subj-eval
+  --checkpoint_dir checkpoints/$hf_repo/ --precision bf16-true --data_dir . --out_dir out --repo_id reinforz/falcon7b-instruct-adapterv2-nf4-subj-eval

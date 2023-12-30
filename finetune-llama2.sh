@@ -13,7 +13,7 @@ git clone https://github.com/Reinforz/lit-gpt .
 git pull
 pip install -r requirements-all.txt
 python scripts/download.py \
-  --repo_id $hf_repo_author/$hf_repo_name
+  --repo_id $hf_repo_author/$hf_repo_name --access_token $HUGGINGFACE_TOKEN
 python scripts/convert_hf_checkpoint.py \
   --checkpoint_dir checkpoints/$hf_repo_author/$hf_repo_name
 curl -s $data_file_url -o /$dir_name/data.json

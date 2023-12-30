@@ -1,6 +1,6 @@
 hf_repo_author="meta-llama"
 hf_repo_name="Llama-2-7b-hf"
-rz_repo_id="reinforz/llama7b-instruct-lora-nf4-subj-eval"
+rz_repo_id="llama7b-instruct-lora-nf4-subj-eval"
 dir_name="thesis"
 # https://cdn.discordapp.com/attachments/1003310779157725194/1190165631086120960/data.json for qg data
 # https://cdn.discordapp.com/attachments/833018351009529856/1189824144754352188/data.json for eval data

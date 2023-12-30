@@ -255,7 +255,7 @@ def train(
         f" {model.max_seq_length} and context length is {model.config.block_size}"
     )
 
-    val_loss, instruction, output = validate(
+    val_loss, prompt, output = validate(
         fabric, model, val_data, tokenizer, max_iters=2
     )  # sanity check
 
@@ -264,12 +264,11 @@ def train(
     loss_prev = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
-    columns = ["step_num", "instruction", "output"]
+    columns = ["step_num", "prompt", "output"]
     output_logged_text = []
 
     # save instruction and output to wandb table
-
-    output_logged_text.append([0, instruction, output])
+    output_logged_text.append([0, prompt, output])
 
     wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
 
@@ -326,13 +325,12 @@ def train(
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.perf_counter()
-            val_loss, instruction, output = validate(
+            val_loss, prompt, output = validate(
                 fabric, model, val_data, tokenizer, max_iters=eval_iters
             )
             wandb.log({"val_loss": val_loss, "train_step": step_count})
             # save instruction and output to wandb table
-
-            output_logged_text.append([step_count, instruction, output])
+            output_logged_text.append([step_count, prompt, output])
             wandb_logger.log_text(
                 key="val_examples", columns=columns, data=output_logged_text
             )
@@ -343,7 +341,7 @@ def train(
             # LOG to discord validation loss
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms",
+                f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms\nOutput:\n {output}",
             )
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
@@ -369,7 +367,7 @@ def validate(
     val_data: List[Dict],
     tokenizer: Tokenizer,
     max_iters: int,
-) -> torch.Tensor:
+) -> Tuple[torch.Tensor, str, str]:
     fabric.print("Validating ...")
     model.eval()
     losses = torch.zeros(max_iters)
@@ -382,11 +380,12 @@ def validate(
     val_loss = losses.mean()
 
     # produce an example:
-    instruction = (
-        "Recommend a movie for me to watch during the weekend and explain the reason."
-    )
+    instruction = "Instructions: Evaluate the answer of the following question. Give a score in terms of relevence, coherene and grammar and explanation of for the evaluation. Please structure your response as follows:\n1. Begin with the 'Answer Evaluation' section, offering an in-depth review and analysis of the student's answer with respect to the given evaluation criteria.\n2. Follow this with a whole number numerical score for relevance (out of 6), coherence (out of 2), and grammar & spelling (out of 2) for the student's answer. Each score should be listed on a new line, preceded by its respective category."
     fabric.print(instruction)
-    sample = {"instruction": instruction, "input": ""}
+    sample = {
+        "instruction": instruction,
+        "input": "Question: How does the concept of plant disease epidemiology contribute to understanding the spread and control of plant diseases? Discuss its implications for the future of sustainable agriculture.\nEvaluation Criteria: The answer should correctly define and explain the concept of plant disease epidemiology and how it is used to study the spread and control of plant diseases.\nThe answer should discuss the implications of plant disease epidemiology for sustainable agriculture, including how it can help prevent disease outbreaks, reduce reliance on chemical pesticides, and promote biodiversity.\nThe answer should demonstrate an understanding of the challenges and limitations of plant disease epidemiology, such as predicting disease spread in the face of climate change and evolving pathogen populations.\nThe answer should be clear, coherent, and logically structured, with an introduction outlining the main points to be discussed, a body where each point is elaborated upon in detail, and a conclusion summarizing the key takeaways.\nThe answer should be grammatically correct and free of spelling mistakes.\nAnswer: Plant disease epidemiology helps us figure out how diseases in plants spread. It's a useful tool because it can guide us on how to prevent or control these diseases. Agriculture could benefit from epidemiology because it can help farmers reduce their use of chemicals. However, there are challenges, such as predicting disease spread in changing climates.",
+    }
     prompt = generate_prompt(sample)
     encoded = tokenizer.encode(prompt, device=fabric.device)
     with fabric.init_tensor():
@@ -404,7 +403,7 @@ def validate(
     fabric.print(output)
 
     model.train()
-    return val_loss, instruction, output
+    return val_loss, prompt, output
 
 
 def get_batch(

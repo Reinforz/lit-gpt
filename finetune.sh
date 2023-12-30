@@ -18,4 +18,4 @@ curl -s $data_file_url -o /$dir_name/data.json
 python scripts/prepare_alpaca.py \
   --data_file_name data.json --destination_path /$dir_name --checkpoint_dir checkpoints/$hf_repo_author/$hf_repo_name
 python finetune/lora.py \
-  --checkpoint_dir checkpoints/$hf_repo_author/$hf_repo_name/ --precision bf16-true --quantize "bnb.nf4" --data_dir /$dir_name --out_dir out/$hf_repo_author --repo_dir reinforz/mistral7b-instruct-lora-nf4-subj-eval
+  --checkpoint_dir checkpoints/$hf_repo_author/$hf_repo_name/ --precision bf16-true --quantize "bnb.nf4" --data_dir /$dir_name --out_dir out/$hf_repo_author --repo_id reinforz/mistral7b-instruct-lora-nf4-subj-eval

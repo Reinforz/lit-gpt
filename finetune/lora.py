@@ -74,6 +74,7 @@ WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 WANDB_PROJECT = os.getenv("WANDB_PROJECT")
 # set up wandb... ensure WANDB_API_KEY env variable is set
 wandb.login()
+api = HfApi()
 
 
 def setup(
@@ -205,8 +206,6 @@ def main(
         # strict=False because missing keys due to LoRA weights not contained in state dict
         load_checkpoint(fabric, model, checkpoint_path, strict=False)
 
-        api = HfApi()
-
         fabric.seed_everything(1337 + fabric.global_rank)
 
         train_time = time.perf_counter()
@@ -220,7 +219,6 @@ def main(
             checkpoint_dir,
             out_dir,
             repo_id,
-            api,
             wandb_logger,
         )
         fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
@@ -265,7 +263,6 @@ def train(
     checkpoint_dir: Path,
     out_dir: Path,
     repo_id: str,
-    api: HfApi,
     wandb_logger: WandbLogger,
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)

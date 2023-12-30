@@ -11,6 +11,9 @@ from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities import ThroughputMonitor
 
+import wandb
+from lightning.pytorch.loggers import WandbLogger 
+
 # support running without installing as a package
 wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
@@ -28,6 +31,9 @@ from lit_gpt.utils import (
 from scripts.prepare_alpaca import generate_prompt
 
 from utils.discord import send_embedded_message
+
+# set up wandb... ensure WANDB_API_KEY env variable is set
+wandb.login()
 
 eval_interval = 100
 save_interval = 100
@@ -62,6 +68,7 @@ hparams = {
     if isinstance(v, (int, float, str)) and not k.startswith("_")
 }
 
+wandb_logger = WandbLogger(project="thesis-subjective-question-evaluation", **{"config": hparams})
 
 def setup(
     data_dir: Path = Path("data/alpaca"),
@@ -109,7 +116,7 @@ def setup(
         devices=devices,
         strategy=strategy,
         precision=precision,
-        loggers=logger,
+        loggers=[logger, wandb_logger],
         plugins=plugins,
     )
     fabric.print(hparams)
@@ -217,13 +224,21 @@ def train(
         f" {model.max_seq_length} and context length is {model.config.block_size}"
     )
 
-    validate(fabric, model, val_data, tokenizer, max_iters=2)  # sanity check
+    val_loss, instruction, output = validate(fabric, model, val_data, tokenizer, max_iters=2)  # sanity check
 
     throughput = ThroughputMonitor(fabric, window_size=50)
     step_count = 0
     loss_now = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
+    columns = ["step_num","instruction", "output"]
+    output_logged_text = []
+    
+    # save instruction and output to wandb table
+
+    output_logged_text.append([0,instruction,output])
+
+    wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
 
     for iter_num in range(1, max_iters + 1):
         if step_count <= warmup_steps:
@@ -271,12 +286,18 @@ def train(
                 f"iter {iter_num} step {step_count}: loss {loss_item:.4f}, iter time:"
                 f" {(t1 - iter_t0) * 1000:.2f}ms{' (optimizer.step)' if not is_accumulating else ''}"
             )
+            wandb.log({"train_loss": loss.item(), "train_step": step_count})
 
         if not is_accumulating and step_count % eval_interval == 0:
             t0 = time.perf_counter()
-            val_loss = validate(
+            val_loss, instruction, output = validate(
                 fabric, model, val_data, tokenizer, max_iters=eval_iters
             )
+            wandb.log({"val_loss": val_loss, "train_step": step_count})
+            # save instruction and output to wandb table
+
+            output_logged_text.append([step_count,instruction,output])
+            wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
             t1 = time.perf_counter() - t0
             fabric.print(
                 f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms"

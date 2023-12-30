@@ -246,8 +246,8 @@ def main(
         send_embedded_message(
             f"Training Error: {repo_id}",
             {
-                "error_message": error_message,
-                "stack_trace": stack_trace,
+                "error_message": f"{error_message}",
+                "stack_trace": f"{stack_trace}",
             },
             mentionTeam=True,
         )

@@ -1,6 +1,7 @@
 import os
 import sys
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple
@@ -144,97 +145,112 @@ def main(
     repo_id: str,
     wandb_logger: WandbLogger,
 ) -> None:
-    check_valid_checkpoint_dir(checkpoint_dir)
+    try:
+        check_valid_checkpoint_dir(checkpoint_dir)
 
-    fabric.seed_everything(1337)  # same seed for every process to init model (FSDP)
+        fabric.seed_everything(1337)  # same seed for every process to init model (FSDP)
 
-    if fabric.global_rank == 0:
-        os.makedirs(out_dir, exist_ok=True)
+        if fabric.global_rank == 0:
+            os.makedirs(out_dir, exist_ok=True)
 
-    train_data = torch.load(data_dir / "train.pt")
-    val_data = torch.load(data_dir / "test.pt")
+        train_data = torch.load(data_dir / "train.pt")
+        val_data = torch.load(data_dir / "test.pt")
 
-    if not any(
-        (lora_query, lora_key, lora_value, lora_projection, lora_mlp, lora_head)
-    ):
-        fabric.print("Warning: all LoRA layers are disabled!")
-    config = Config.from_name(
-        name=checkpoint_dir.name,
-        r=lora_r,
-        alpha=lora_alpha,
-        dropout=lora_dropout,
-        to_query=lora_query,
-        to_key=lora_key,
-        to_value=lora_value,
-        to_projection=lora_projection,
-        to_mlp=lora_mlp,
-        to_head=lora_head,
-    )
-    checkpoint_path = checkpoint_dir / "lit_model.pth"
-    fabric.print(f"Loading model {str(checkpoint_path)!r} with {config.__dict__}")
-    with fabric.init_module(empty_init=(devices > 1)):
-        model = GPT(config)
-    mark_only_lora_as_trainable(model)
-
-    fabric.print(
-        f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}"
-    )
-    fabric.print(
-        f"Number of non trainable parameters: {num_parameters(model, requires_grad=False):,}"
-    )
-
-    model = fabric.setup_module(model)
-
-    trainable_params = [p for p in model.parameters() if p.requires_grad]
-    if isinstance(fabric.strategy.precision, BitsandbytesPrecision):
-        import bitsandbytes as bnb
-
-        optimizer = bnb.optim.PagedAdamW(
-            trainable_params, lr=learning_rate, weight_decay=weight_decay
+        if not any(
+            (lora_query, lora_key, lora_value, lora_projection, lora_mlp, lora_head)
+        ):
+            fabric.print("Warning: all LoRA layers are disabled!")
+        config = Config.from_name(
+            name=checkpoint_dir.name,
+            r=lora_r,
+            alpha=lora_alpha,
+            dropout=lora_dropout,
+            to_query=lora_query,
+            to_key=lora_key,
+            to_value=lora_value,
+            to_projection=lora_projection,
+            to_mlp=lora_mlp,
+            to_head=lora_head,
         )
-    else:
-        optimizer = torch.optim.AdamW(
-            trainable_params, lr=learning_rate, weight_decay=weight_decay
+        checkpoint_path = checkpoint_dir / "lit_model.pth"
+        fabric.print(f"Loading model {str(checkpoint_path)!r} with {config.__dict__}")
+        with fabric.init_module(empty_init=(devices > 1)):
+            model = GPT(config)
+        mark_only_lora_as_trainable(model)
+
+        fabric.print(
+            f"Number of trainable parameters: {num_parameters(model, requires_grad=True):,}"
         )
-    optimizer = fabric.setup_optimizers(optimizer)
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-        optimizer, T_max=max_iters // batch_size
-    )
+        fabric.print(
+            f"Number of non trainable parameters: {num_parameters(model, requires_grad=False):,}"
+        )
 
-    # strict=False because missing keys due to LoRA weights not contained in state dict
-    load_checkpoint(fabric, model, checkpoint_path, strict=False)
+        model = fabric.setup_module(model)
 
-    api = HfApi()
+        trainable_params = [p for p in model.parameters() if p.requires_grad]
+        if isinstance(fabric.strategy.precision, BitsandbytesPrecision):
+            import bitsandbytes as bnb
 
-    fabric.seed_everything(1337 + fabric.global_rank)
+            optimizer = bnb.optim.PagedAdamW(
+                trainable_params, lr=learning_rate, weight_decay=weight_decay
+            )
+        else:
+            optimizer = torch.optim.AdamW(
+                trainable_params, lr=learning_rate, weight_decay=weight_decay
+            )
+        optimizer = fabric.setup_optimizers(optimizer)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=max_iters // batch_size
+        )
 
-    train_time = time.perf_counter()
-    train(
-        fabric,
-        model,
-        optimizer,
-        scheduler,
-        train_data,
-        val_data,
-        checkpoint_dir,
-        out_dir,
-        repo_id,
-        api,
-        wandb_logger,
-    )
-    fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
-    if fabric.device.type == "cuda":
-        fabric.print(f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB")
+        # strict=False because missing keys due to LoRA weights not contained in state dict
+        load_checkpoint(fabric, model, checkpoint_path, strict=False)
 
-    # Save the final LoRA checkpoint at the end of training
-    save_path = out_dir / "lit_model_lora_finetuned.pth"
-    save_lora_checkpoint(fabric, model, save_path)
-    api.upload_folder(
-        folder_path=out_dir,
-        path_in_repo="./",
-        repo_id=str(repo_id),
-        repo_type="model",
-    )
+        api = HfApi()
+
+        fabric.seed_everything(1337 + fabric.global_rank)
+
+        train_time = time.perf_counter()
+        train(
+            fabric,
+            model,
+            optimizer,
+            scheduler,
+            train_data,
+            val_data,
+            checkpoint_dir,
+            out_dir,
+            repo_id,
+            api,
+            wandb_logger,
+        )
+        fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
+        if fabric.device.type == "cuda":
+            fabric.print(
+                f"Memory used: {torch.cuda.max_memory_allocated() / 1e9:.02f} GB"
+            )
+
+        # Save the final LoRA checkpoint at the end of training
+        save_path = out_dir / "lit_model_lora_finetuned.pth"
+        save_lora_checkpoint(fabric, model, save_path)
+        api.upload_folder(
+            folder_path=out_dir,
+            path_in_repo="./",
+            repo_id=str(repo_id),
+            repo_type="model",
+        )
+
+    except Exception as e:
+        error_message = str(e)
+        stack_trace = traceback.format_exc()
+        send_embedded_message(
+            f"Training Error: {repo_id}",
+            {
+                "error_message": error_message,
+                "stack_trace": stack_trace,
+            },
+            mentionTeam=True,
+        )
 
 
 def train(

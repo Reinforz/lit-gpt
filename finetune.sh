@@ -3,7 +3,7 @@ hf_repo_name="Mistral-7B-Instruct-v0.1"
 dir_name="thesis"
 # https://cdn.discordapp.com/attachments/1003310779157725194/1190165631086120960/data.json for qg data
 # https://cdn.discordapp.com/attachments/833018351009529856/1189824144754352188/data.json for eval data
-data_file_url="https://cdn.discordapp.com/attachments/833018351009529856/1189824144754352188/data.json"
+data_file_url="https://cdn.discordapp.com/attachments/1003310779157725194/1190563478814072892/train.json"
 
 cd workspace
 mkdir $dir_name

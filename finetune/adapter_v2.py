@@ -111,7 +111,7 @@ def setup(
         loggers=[logger, wandb_logger],
     )
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir, repo_id, wandb_logger)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, repo_id)
 
 
 def main(
@@ -120,7 +120,6 @@ def main(
     checkpoint_dir: Path,
     out_dir: Path,
     repo_id: str,
-    wandb_logger: WandbLogger,
 ) -> None:
     try:
         check_valid_checkpoint_dir(checkpoint_dir)
@@ -169,7 +168,6 @@ def main(
             checkpoint_dir,
             out_dir,
             repo_id,
-            wandb_logger,
         )
         fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
         if fabric.device.type == "cuda":
@@ -212,7 +210,6 @@ def train(
     checkpoint_dir: Path,
     out_dir: Path,
     repo_id: str,
-    wandb_logger: WandbLogger,
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     longest_seq_length, longest_seq_ix = get_longest_seq_length(train_data)

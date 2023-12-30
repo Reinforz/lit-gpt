@@ -10,9 +10,10 @@ from lightning.fabric.loggers import CSVLogger
 from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities import ThroughputMonitor
+from huggingface_hub import login, HfApi
 
 import wandb
-from lightning.pytorch.loggers import WandbLogger 
+from lightning.pytorch.loggers import WandbLogger
 
 # support running without installing as a package
 wd = Path(__file__).parent.parent.resolve()
@@ -35,10 +36,11 @@ from utils.discord import send_embedded_message
 # set up wandb... ensure WANDB_API_KEY env variable is set
 wandb.login()
 
-eval_interval = 100
-save_interval = 100
+# Training settings
+eval_interval = 25
+save_interval = 25
 eval_iters = 100
-eval_max_new_tokens = 100
+eval_max_new_tokens = 350
 log_interval = 1
 devices = 1
 
@@ -49,17 +51,17 @@ micro_batch_size = 1
 gradient_accumulation_iters = batch_size // micro_batch_size
 assert gradient_accumulation_iters > 0
 max_seq_length = None  # assign value to truncate
-max_iters = 10000  # train dataset size
+max_iters = 20000  # train dataset size
 weight_decay = 0.01
 lora_r = 8
 lora_alpha = 16
 lora_dropout = 0.1
 lora_query = True
-lora_key = False
+lora_key = True
 lora_value = True
-lora_projection = False
-lora_mlp = False
-lora_head = False
+lora_projection = True
+lora_mlp = True
+lora_head = True
 warmup_steps = 100
 
 hparams = {
@@ -68,7 +70,10 @@ hparams = {
     if isinstance(v, (int, float, str)) and not k.startswith("_")
 }
 
-wandb_logger = WandbLogger(project="thesis-subjective-question-evaluation", **{"config": hparams})
+wandb_logger = WandbLogger(
+    project="thesis-subjective-question-evaluation", **{"config": hparams}
+)
+
 
 def setup(
     data_dir: Path = Path("data/alpaca"),
@@ -78,6 +83,7 @@ def setup(
     quantize: Optional[
         Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8-training"]
     ] = None,
+    repo_id: Optional[Path] = "models/model",
 ) -> None:
     precision = precision or get_default_supported_precision(training=True)
 
@@ -120,10 +126,16 @@ def setup(
         plugins=plugins,
     )
     fabric.print(hparams)
-    fabric.launch(main, data_dir, checkpoint_dir, out_dir)
+    fabric.launch(main, data_dir, checkpoint_dir, out_dir, repo_id)
 
 
-def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path) -> None:
+def main(
+    fabric: L.Fabric,
+    data_dir: Path,
+    checkpoint_dir: Path,
+    out_dir: Path,
+    repo_id: Path,
+) -> None:
     check_valid_checkpoint_dir(checkpoint_dir)
 
     fabric.seed_everything(1337)  # same seed for every process to init model (FSDP)
@@ -184,6 +196,11 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path) 
     # strict=False because missing keys due to LoRA weights not contained in state dict
     load_checkpoint(fabric, model, checkpoint_path, strict=False)
 
+    # Hugging Face Hub login
+    token = os.getenv("HUGGINGFACE_TOKEN")
+    login(token=token)
+    api = HfApi()
+
     fabric.seed_everything(1337 + fabric.global_rank)
 
     train_time = time.perf_counter()
@@ -196,6 +213,8 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path) 
         val_data,
         checkpoint_dir,
         out_dir,
+        repo_id,
+        api,
     )
     fabric.print(f"Training time: {(time.perf_counter()-train_time):.2f}s")
     if fabric.device.type == "cuda":
@@ -204,6 +223,12 @@ def main(fabric: L.Fabric, data_dir: Path, checkpoint_dir: Path, out_dir: Path) 
     # Save the final LoRA checkpoint at the end of training
     save_path = out_dir / "lit_model_lora_finetuned.pth"
     save_lora_checkpoint(fabric, model, save_path)
+    api.upload_folder(
+        folder_path=out_dir,
+        path_in_repo="./",
+        repo_id=repo_id,
+        repo_type="model",
+    )
 
 
 def train(
@@ -215,6 +240,8 @@ def train(
     val_data: List[Dict],
     checkpoint_dir: Path,
     out_dir: Path,
+    repo_id: Path,
+    api: HfApi,
 ) -> None:
     tokenizer = Tokenizer(checkpoint_dir)
     longest_seq_length, longest_seq_ix = get_longest_seq_length(train_data)
@@ -224,19 +251,21 @@ def train(
         f" {model.max_seq_length} and context length is {model.config.block_size}"
     )
 
-    val_loss, instruction, output = validate(fabric, model, val_data, tokenizer, max_iters=2)  # sanity check
+    val_loss, instruction, output = validate(
+        fabric, model, val_data, tokenizer, max_iters=2
+    )  # sanity check
 
     throughput = ThroughputMonitor(fabric, window_size=50)
     step_count = 0
     loss_now = 1
     total_lengths = 0
     total_t0 = time.perf_counter()
-    columns = ["step_num","instruction", "output"]
+    columns = ["step_num", "instruction", "output"]
     output_logged_text = []
-    
+
     # save instruction and output to wandb table
 
-    output_logged_text.append([0,instruction,output])
+    output_logged_text.append([0, instruction, output])
 
     wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
 
@@ -268,7 +297,10 @@ def train(
                 scheduler.step()
             step_count += 1
             # LOG to discord here
-            send_embedded_message("Training Eval", f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss_now - loss.item():.4f}")
+            send_embedded_message(
+                "Training Eval",
+                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss_now - loss.item():.4f}",
+            )
             loss_now = loss.item()
 
         total_lengths += input_ids.numel()
@@ -296,17 +328,30 @@ def train(
             wandb.log({"val_loss": val_loss, "train_step": step_count})
             # save instruction and output to wandb table
 
-            output_logged_text.append([step_count,instruction,output])
-            wandb_logger.log_text(key="val_examples", columns=columns, data=output_logged_text)
+            output_logged_text.append([step_count, instruction, output])
+            wandb_logger.log_text(
+                key="val_examples", columns=columns, data=output_logged_text
+            )
             t1 = time.perf_counter() - t0
             fabric.print(
                 f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms"
+            )
+            # LOG to discord validation loss
+            send_embedded_message(
+                "Training Eval",
+                f"step {iter_num}: val loss {val_loss.item():.4f}, val time: {t1 * 1000:.2f}ms",
             )
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
             checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
-    
+            api.upload_folder(
+                folder_path=out_dir,
+                path_in_repo="./",
+                repo_id=repo_id,
+                repo_type="model",
+            )
+
     send_embedded_message("Training Complete", f"Eval training", mentionTeam=True)
 
 

@@ -1,5 +1,5 @@
 hf_repo_author="mistralai"
-hf_repo_name="Mistral-7B-Instruct-v0.2"
+hf_repo_name="Mistral-7B-Instruct-v0.1"
 dir_name="thesis"
 # https://cdn.discordapp.com/attachments/1003310779157725194/1190165631086120960/data.json for qg data
 # https://cdn.discordapp.com/attachments/833018351009529856/1189824144754352188/data.json for eval data

@@ -303,7 +303,7 @@ def train(
             # LOG to discord here
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss_now - loss.item():.4f}",
+                f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss.item() - loss_now:.4f}",
             )
             loss_now = loss.item()
 

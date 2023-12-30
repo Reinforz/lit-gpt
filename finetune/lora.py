@@ -302,7 +302,12 @@ def train(
             # LOG to discord here
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                {"iteration":f"{iter_num}", "step":f"{step_count}", "loss":f"{loss.item():.4f}", "loss_diff": f"{loss.item() - loss_prev:.4f}"},
+                {
+                    "iteration": f"{iter_num}",
+                    "step": f"{step_count}",
+                    "loss": f"{loss.item():.4f}",
+                    "loss_diff": f"{loss.item() - loss_prev:.4f}",
+                },
             )
             wandb.log({"train_loss": loss.item(), "train_step": step_count})
             loss_prev = loss.item()
@@ -341,7 +346,12 @@ def train(
             # LOG to discord validation loss
             send_embedded_message(
                 f"Training Eval: {repo_id}",
-                {"step": f"{iter_num}","val loss":f"{val_loss.item():.4f}", "val time": f"{t1 * 1000:.2f}ms","Output":f"{output}"}
+                {
+                    "step": f"{iter_num}",
+                    "val loss": f"{val_loss.item():.4f}",
+                    "val time": f"{t1 * 1000:.2f}ms",
+                    "Output": f"{output}",
+                },
             )
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
@@ -373,6 +383,10 @@ def validate(
     losses = torch.zeros(max_iters)
     for k in range(max_iters):
         input_ids, targets = get_batch(fabric, val_data)
+        if input_ids.shape[1] > model.max_seq_length:
+            input_ids = input_ids[:, : model.max_seq_length]
+        if targets.shape[1] > model.max_seq_length:
+            targets = targets[:, : model.max_seq_length]
         logits = model(input_ids)
         losses[k] = chunked_cross_entropy(
             logits[..., :-1, :], targets[..., 1:], chunk_size=0

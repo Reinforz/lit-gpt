@@ -37,7 +37,7 @@ wandb.login()
 
 # Training settings
 eval_interval = 25
-save_interval = 25
+save_interval = 10
 eval_iters = 100
 eval_max_new_tokens = 350
 log_interval = 1
@@ -78,7 +78,7 @@ def setup(
     quantize: Optional[
         Literal["bnb.nf4", "bnb.nf4-dq", "bnb.fp4", "bnb.fp4-dq", "bnb.int8-training"]
     ] = None,
-    repo_id: Optional[Path] = "models/model",
+    repo_id: str = "models/model",
 ) -> None:
     wandb_logger = WandbLogger(
         project="thesis-subjective-question-evaluation",
@@ -135,7 +135,7 @@ def main(
     data_dir: Path,
     checkpoint_dir: Path,
     out_dir: Path,
-    repo_id: Path,
+    repo_id: str,
     wandb_logger: WandbLogger,
 ) -> None:
     check_valid_checkpoint_dir(checkpoint_dir)
@@ -229,7 +229,7 @@ def main(
     api.upload_folder(
         folder_path=out_dir,
         path_in_repo="./",
-        repo_id=repo_id,
+        repo_id=str(repo_id),
         repo_type="model",
     )
 
@@ -243,7 +243,7 @@ def train(
     val_data: List[Dict],
     checkpoint_dir: Path,
     out_dir: Path,
-    repo_id: Path,
+    repo_id: str,
     api: HfApi,
     wandb_logger: WandbLogger,
 ) -> None:

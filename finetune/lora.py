@@ -353,7 +353,7 @@ def validate(
     fabric.print(output)
 
     model.train()
-    return val_loss
+    return val_loss, instruction, output
 
 
 def get_batch(

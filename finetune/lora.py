@@ -21,17 +21,17 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 from generate.base import generate
-from lit_gpt.lora import (GPT, Block, Config, lora_filter,
-                          mark_only_lora_as_trainable)
+from lit_gpt.lora import GPT, Block, Config, lora_filter, mark_only_lora_as_trainable
 from lit_gpt.tokenizer import Tokenizer
-from lit_gpt.utils import (check_valid_checkpoint_dir, chunked_cross_entropy,
-                           get_default_supported_precision, load_checkpoint,
-                           num_parameters)
+from lit_gpt.utils import (
+    check_valid_checkpoint_dir,
+    chunked_cross_entropy,
+    get_default_supported_precision,
+    load_checkpoint,
+    num_parameters,
+)
 from scripts.prepare_alpaca import generate_prompt
 from utils.discord import send_embedded_message
-
-# set up wandb... ensure WANDB_API_KEY env variable is set
-wandb.login()
 
 # Training settings
 eval_interval = 10
@@ -72,6 +72,8 @@ HUGGINGFACE_TOKEN = os.getenv("HUGGINGFACE_TOKEN")
 login(token=HUGGINGFACE_TOKEN)
 WANDB_API_KEY = os.getenv("WANDB_API_KEY")
 WANDB_PROJECT = os.getenv("WANDB_PROJECT")
+# set up wandb... ensure WANDB_API_KEY env variable is set
+wandb.login()
 
 
 def setup(
@@ -458,7 +460,6 @@ def validate(
 
     # produce an example:
     instruction = "Instructions: Evaluate the answer of the following question. Give a score in terms of relevance, coherence and grammar and explanation of for the evaluation. Please structure your response as follows:\n1. Begin with the 'Answer Evaluation' section, offering an in-depth review and analysis of the student's answer with respect to the given evaluation criteria.\n2. Follow this with a whole number numerical score for relevance (out of 6), coherence (out of 2), and grammar & spelling (out of 2) for the student's answer. Each score should be listed on a new line, preceded by its respective category."
-    fabric.print(instruction)
 
     prompts = []
     outputs = []

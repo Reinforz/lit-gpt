@@ -1,19 +1,18 @@
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Tuple
-from datetime import datetime
 
 import lightning as L
 import torch
+import wandb
+from huggingface_hub import HfApi, login
 from lightning.fabric.loggers import CSVLogger
 from lightning.fabric.plugins import BitsandbytesPrecision
 from lightning.fabric.strategies import FSDPStrategy
 from lightning.fabric.utilities import ThroughputMonitor
-from huggingface_hub import login, HfApi
-
-import wandb
 from lightning.pytorch.loggers import WandbLogger
 
 # support running without installing as a package
@@ -31,7 +30,6 @@ from lit_gpt.utils import (
     num_parameters,
 )
 from scripts.prepare_alpaca import generate_prompt
-
 from utils.discord import send_embedded_message
 
 # set up wandb... ensure WANDB_API_KEY env variable is set
@@ -82,12 +80,10 @@ def setup(
     ] = None,
     repo_id: Optional[Path] = "models/model",
 ) -> None:
-    os.environ[
-        "WANDB_NAME"
-    ] = f"{repo_id}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}"
-
     wandb_logger = WandbLogger(
-        project="thesis-subjective-question-evaluation", **{"config": hparams}
+        project="thesis-subjective-question-evaluation",
+        **{"config": hparams},
+        name=f"{repo_id}-{datetime.now().strftime('%Y-%m-%d-%H-%M-%S')}",
     )
 
     precision = precision or get_default_supported_precision(training=True)
@@ -306,7 +302,7 @@ def train(
             step_count += 1
             # LOG to discord here
             send_embedded_message(
-                "Training Eval",
+                f"Training Eval: {repo_id}",
                 f"iter {iter_num} step {step_count}: loss {loss.item():.4f}, loss_diff: {loss_now - loss.item():.4f}",
             )
             loss_now = loss.item()
@@ -360,7 +356,9 @@ def train(
                 repo_type="model",
             )
 
-    send_embedded_message(f"Training Complete: {repo_id}", f"Eval training", mentionTeam=True)
+    send_embedded_message(
+        f"Training Complete: {repo_id}", f"Eval training", mentionTeam=True
+    )
 
 
 # FSDP has issues with `inference_mode`

@@ -355,7 +355,7 @@ def train(
             )
             fabric.barrier()
         if not is_accumulating and step_count % save_interval == 0:
-            checkpoint_path = out_dir / f"iter-{iter_num:06d}-ckpt.pth"
+            checkpoint_path = out_dir / f"step-{step_count:03d}-ckpt.pth"
             save_lora_checkpoint(fabric, model, checkpoint_path)
             api.upload_folder(
                 folder_path=out_dir,

@@ -360,7 +360,7 @@ def train(
                 repo_type="model",
             )
 
-    send_embedded_message("Training Complete", f"Eval training", mentionTeam=True)
+    send_embedded_message(f"Training Complete: {repo_id}", f"Eval training", mentionTeam=True)
 
 
 # FSDP has issues with `inference_mode`

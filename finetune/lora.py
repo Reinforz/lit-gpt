@@ -21,15 +21,12 @@ wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
 from generate.base import generate
-from lit_gpt.lora import GPT, Block, Config, lora_filter, mark_only_lora_as_trainable
+from lit_gpt.lora import (GPT, Block, Config, lora_filter,
+                          mark_only_lora_as_trainable)
 from lit_gpt.tokenizer import Tokenizer
-from lit_gpt.utils import (
-    check_valid_checkpoint_dir,
-    chunked_cross_entropy,
-    get_default_supported_precision,
-    load_checkpoint,
-    num_parameters,
-)
+from lit_gpt.utils import (check_valid_checkpoint_dir, chunked_cross_entropy,
+                           get_default_supported_precision, load_checkpoint,
+                           num_parameters)
 from scripts.prepare_alpaca import generate_prompt
 from utils.discord import send_embedded_message
 
@@ -302,6 +299,7 @@ def train(
     output_logged_text.append(
         [
             0,
+            prompts[0],
             outputs[0],
             prompts[1],
             outputs[1],

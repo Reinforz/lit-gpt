@@ -252,6 +252,7 @@ def main(
             },
             mentionTeam=True,
         )
+        raise e
 
 
 def train(

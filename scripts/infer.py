@@ -102,7 +102,7 @@ def infer(
 
     dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
 
-    send_embedded_message("Inference", "Completed.")
+    send_embedded_message("Inference", "Completed.", mentionTeam=True)
 
 
 def infer_sample(

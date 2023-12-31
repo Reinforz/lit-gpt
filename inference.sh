@@ -3,12 +3,13 @@ lora_repo="reinforz/mistral7b-instruct-lora-nf4-subj-eval"
 model_name="mistral7b-instruct-lora-nf4-subj-eval"
 data_file_url=https://cdn.discordapp.com/attachments/1003310779157725194/1190563367685980160/test.json
 
+cd workspace
+
 git clone https://github.com/Reinforz/lit-gpt .
 pip install -r requirements-all.txt
 pip uninstall -y torch torchvision torchaudio torchtext
 pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu121
 
-cd workspace
 curl -s $data_file_url -o data.json
 python scripts/download.py \
   --repo_id $base_model_repo

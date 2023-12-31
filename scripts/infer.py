@@ -40,10 +40,10 @@ lora_head = True
 
 
 def infer(
-    data_dir: Path,
-    checkpoint_dir: Path,
-    lora_repo: str,
-    model_name: str,
+    data_dir: Path = Path("data/test.json"),
+    checkpoint_dir: Path = Path("checkpoints/stabilityai/stablelm-base-alpha-3b"),
+    lora_repo: str = "reinforz/lora-alpaca",
+    model_name: str = "stablelm-base-alpha-3b",
     lora_dir: Optional[Path] = None,
     resume_index: Optional[int] = 0,
 ) -> None:
@@ -66,7 +66,6 @@ def infer(
         lora_dir = Path(f"out/lora/{model_name}")
         snapshot_download(
             repo_id=lora_repo,
-            path_in_repo="",
             local_dir=lora_dir,
             token=token,
         )

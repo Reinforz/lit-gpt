@@ -21,7 +21,7 @@ from lit_gpt.utils import (
 from scripts.prepare_alpaca import generate_prompt
 
 from datasets import Dataset
-from huggingface_hub import login, HfApi
+from huggingface_hub import snapshot_download
 
 lora_r = 8
 lora_alpha = 16
@@ -34,7 +34,9 @@ lora_mlp = True
 lora_head = True
 
 
-def infer(test_data: Path, model_dir: Path, lora_dir: Path, model_name: str) -> None:
+def infer(
+    data_dir: Path, checkpoint_dir: Path, lora_repo: str, model_name: str
+) -> None:
     """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
 
     Args:
@@ -42,18 +44,27 @@ def infer(test_data: Path, model_dir: Path, lora_dir: Path, model_name: str) -> 
         model_dir (Path): Path to the model checkpoint directory.
         lora_dir (Path): Path to the lora checkpoint directory.
         model_name (str): Name of the model to be .
-
     """
+
     token = os.getenv("HUGGINGFACE_TOKEN")
 
-    with open(test_data, "r", encoding="utf-8") as file:
+    with open(data_dir, "r", encoding="utf-8") as file:
         data = json.load(file)
+
+    lora_dir = Path(f"out/lora/{model_name}")
+
+    snapshot_download(
+        repo_id=lora_repo,
+        path_in_repo="",
+        local_dir=lora_dir,
+        token=token,
+    )
 
     results = []  # list of dicts
 
     model, tokenizer, fabric, max_return_token = setup_model(
         lora_path=lora_dir,
-        checkpoint_dir=model_dir,
+        checkpoint_dir=checkpoint_dir,
         quantize="bnb.nf4",
         max_new_tokens=500,
         precision="bf16-true",

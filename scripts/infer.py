@@ -77,7 +77,7 @@ def infer(
         )
     else:
         data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
-        dataset = Dataset(data_dict)
+        dataset = Dataset.from_dict(data_dict)
 
     model, tokenizer, fabric, max_return_token = setup_model(
         lora_path=lora_dir,

@@ -35,7 +35,11 @@ lora_head = True
 
 
 def infer(
-    data_dir: Path, checkpoint_dir: Path, lora_repo: str, model_name: str
+    data_dir: Path,
+    checkpoint_dir: Path,
+    lora_repo: str,
+    model_name: str,
+    lora_dir: Optional[Path] = None,
 ) -> None:
     """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
 
@@ -51,14 +55,14 @@ def infer(
     with open(data_dir, "r", encoding="utf-8") as file:
         data = json.load(file)
 
-    lora_dir = Path(f"out/lora/{model_name}")
-
-    snapshot_download(
-        repo_id=lora_repo,
-        path_in_repo="",
-        local_dir=lora_dir,
-        token=token,
-    )
+    if not lora_dir:
+        lora_dir = Path(f"out/lora/{model_name}")
+        snapshot_download(
+            repo_id=lora_repo,
+            path_in_repo="",
+            local_dir=lora_dir,
+            token=token,
+        )
 
     results = []  # list of dicts
 

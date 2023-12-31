@@ -44,7 +44,7 @@ def infer(
     checkpoint_dir: Path = Path("checkpoints/stabilityai/stablelm-base-alpha-3b"),
     lora_repo: str = "reinforz/lora-alpaca",
     model_name: str = "stablelm-base-alpha-3b",
-    lora_file: Optional[Path] = None,
+    lora_file: str = "lit_model_lora_finetuned.pth",
     resume_index: Optional[int] = 0,
 ) -> None:
     """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
@@ -52,7 +52,9 @@ def infer(
     Args:
         test_data (Path): Path to the test data file.
         model_dir (Path): Path to the model checkpoint directory.
-        lora_dir (Path): Path to the lora checkpoint directory.
+        lora_file (str): Name of the Lora checkpoint file.
+        resume_index (int): Index of the last sample that was processed. Used to resume inference.
+        lora_repo (str): Name of the Huggingface repo where the Lora checkpoint is stored.
         model_name (str): Name of the model to be .
     """
 

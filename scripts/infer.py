@@ -10,6 +10,9 @@ import lightning as L
 import torch
 from lightning.fabric.plugins import BitsandbytesPrecision
 
+wd = Path(__file__).parent.parent.resolve()
+sys.path.append(str(wd))
+
 from generate.base import generate
 from lit_gpt import Tokenizer
 from lit_gpt.lora import GPT, Config, merge_lora_weights

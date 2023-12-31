@@ -1,10 +1,11 @@
 import sys
 import os
 import time
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Tuple
 from pathlib import Path
 import json
 
+from jsonargparse import CLI
 import lightning as L
 import torch
 from lightning.fabric.plugins import BitsandbytesPrecision
@@ -33,52 +34,55 @@ lora_mlp = True
 lora_head = True
 
 
-def infer(test_data: Path):
+def infer(test_data: Path, model_dir: Path, lora_dir: Path, model_name: str) -> None:
+    """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
+
+    Args:
+        test_data (Path): Path to the test data file.
+        model_dir (Path): Path to the model checkpoint directory.
+        lora_dir (Path): Path to the lora checkpoint directory.
+        model_name (str): Name of the model to be .
+
+    """
     token = os.getenv("HUGGINGFACE_TOKEN")
-    login(token=token)
-
-    api = HfApi()
-
-    models = []
 
     with open(test_data, "r", encoding="utf-8") as file:
         data = json.load(file)
 
-    results = [{} for sample in data]  # list of dicts
-    # [{input: str, model_name1: str, model_name2: str, ...}]
+    results = []  # list of dicts
 
-    for model_path in models:
-        model, tokenizer, fabric, max_return_token = setup_model(
-            lora_path=Path(model),
-            checkpoint_dir=model_path,
-            quantize="bnb.nf4",
-            max_new_tokens=500,
-            precision="bf16-true",
-            data=data,
+    model, tokenizer, fabric, max_return_token = setup_model(
+        lora_path=lora_dir,
+        checkpoint_dir=model_dir,
+        quantize="bnb.nf4",
+        max_new_tokens=500,
+        precision="bf16-true",
+        data=data,
+    )
+    for i, sample in enumerate(data):
+        prompt, response = infer_sample(
+            prompt=sample["instruction"],
+            input=sample["input"],
+            max_returned_tokens=max_return_token,
+            tokenizer=tokenizer,
+            model=model,
+            fabric=fabric,
+            top_k=200,
+            temperature=0.8,
         )
-        for i, sample in enumerate(data):
-            output = infer_sample(
-                prompt=sample["instruction"],
-                input=sample["input"],
-                max_returned_tokens=max_return_token,
-                tokenizer=tokenizer,
-                model=model,
-                fabric=fabric,
-                top_k=200,
-                temperature=0.8,
-            )
-            results[i][model_path] = output
-            if i % 25 == 0:
-                with open("inference/inference.json", "w", encoding="utf-8") as file:
-                    json.dump(results, file)
-                api.upload_file(
-                    path_or_fileobj="inference/inference.json",
-                    path_in_repo="inference.json",
-                    repo_id="reinforz/inference-results",
-                    repo_type="dataset",
-                )
-        # delete model
-        del model, tokenizer, fabric
+        results.append({"prompt": prompt, "response": response})
+        # if i % 25 == 0:
+        #     with open("inference/inference.json", "w", encoding="utf-8") as file:
+        #         json.dump(results, file)
+        #     api.upload_file(
+        #         path_or_fileobj="inference/inference.json",
+        #         path_in_repo="inference.json",
+        #         repo_id="reinforz/inference-results",
+        #         repo_type="dataset",
+        #     )
+    dataset = Dataset.from_dict(results)
+
+    dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
 
 
 def infer_sample(
@@ -90,7 +94,7 @@ def infer_sample(
     fabric: L.Fabric,
     top_k: int = 200,
     temperature: float = 0.8,
-):
+) -> Tuple[str, str]:
     sample = {"instruction": prompt, "input": input}
     prompt = generate_prompt(sample)
     encoded = tokenizer.encode(prompt, device=fabric.device)
@@ -109,8 +113,8 @@ def infer_sample(
     )
     t = time.perf_counter() - t0
 
-    output = tokenizer.decode(y)
-    output = output.split("### Response:")[1].strip()
+    response = tokenizer.decode(y)
+    response = response.split("### Response:")[1].strip()
     # fabric.print(output)
 
     tokens_generated = y.size(0) - prompt_length
@@ -124,7 +128,7 @@ def infer_sample(
             file=sys.stderr,
         )
 
-    return output
+    return prompt, response
 
 
 def setup_model(
@@ -136,11 +140,9 @@ def setup_model(
         ]
     ],
     max_new_tokens: int,
-    top_k: int,
-    temperature: float,
     precision: str,
     data: List[dict],
-):
+) -> Tuple[GPT, Tokenizer, L.Fabric, int]:
     """Generates a response based on a given instruction and an optional input."""
     # precision = precision or get_default_supported_precision(training=False)
 
@@ -243,4 +245,5 @@ def get_max_length(
 
 
 if __name__ == "__main__":
-    infer(Path("inference/test_data.json"))
+    torch.set_float32_matmul_precision("high")
+    CLI(infer)

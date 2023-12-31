@@ -44,7 +44,7 @@ def infer(
     checkpoint_dir: Path = Path("checkpoints/stabilityai/stablelm-base-alpha-3b"),
     lora_repo: str = "reinforz/lora-alpaca",
     model_name: str = "stablelm-base-alpha-3b",
-    lora_dir: Optional[Path] = None,
+    lora_file: Optional[Path] = None,
     resume_index: Optional[int] = 0,
 ) -> None:
     """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
@@ -63,8 +63,8 @@ def infer(
         if resume_index != 0:
             data = data[resume_index + 1 :]
 
-    if not lora_dir:
-        lora_dir = Path(f"out/lora/{model_name}")
+    lora_dir = Path(f"out/lora/{model_name}/{lora_file}")
+    if not lora_dir.exists():
         snapshot_download(
             repo_id=lora_repo,
             local_dir=lora_dir,

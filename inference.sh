@@ -1,4 +1,4 @@
-base_model_repo="mistralai/Mistral-7B-Instruct-v0.2"
+base_model_repo="mistralai/Mistral-7B-Instruct-v0.1"
 lora_repo="reinforz/mistral7b-instruct-lora-nf4-subj-eval"
 model_name="mistral7b-instruct-lora-nf4-subj-eval"
 data_file_url=https://cdn.discordapp.com/attachments/1003310779157725194/1190563367685980160/test.json

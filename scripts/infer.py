@@ -22,6 +22,8 @@ from scripts.prepare_alpaca import generate_prompt
 
 from datasets import Dataset
 from huggingface_hub import snapshot_download
+from utils.discord import send_embedded_message
+
 
 lora_r = 8
 lora_alpha = 16
@@ -40,6 +42,7 @@ def infer(
     lora_repo: str,
     model_name: str,
     lora_dir: Optional[Path] = None,
+    resume_index: Optional[int] = 0,
 ) -> None:
     """Generates a dataset of responses for the given test data prompts and saves it to Huggingface.
 
@@ -54,6 +57,7 @@ def infer(
 
     with open(data_dir, "r", encoding="utf-8") as file:
         data = json.load(file)
+        data = data[resume_index + 1 :]
 
     if not lora_dir:
         lora_dir = Path(f"out/lora/{model_name}")
@@ -74,6 +78,9 @@ def infer(
         precision="bf16-true",
         data=data,
     )
+
+    total_samples = len(data)
+
     for i, sample in enumerate(data):
         prompt, response = infer_sample(
             prompt=sample["instruction"],
@@ -86,18 +93,16 @@ def infer(
             temperature=0.8,
         )
         results.append({"prompt": prompt, "response": response})
-        # if i % 25 == 0:
-        #     with open("inference/inference.json", "w", encoding="utf-8") as file:
-        #         json.dump(results, file)
-        #     api.upload_file(
-        #         path_or_fileobj="inference/inference.json",
-        #         path_in_repo="inference.json",
-        #         repo_id="reinforz/inference-results",
-        #         repo_type="dataset",
-        #     )
+        if (i + 1) % 25 == 0:
+            dataset = Dataset.from_dict(results)
+            dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
+
+            send_embedded_message("Inference", f"Finished {i+1}/{total_samples}.")
     dataset = Dataset.from_dict(results)
 
     dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
+
+    send_embedded_message("Inference", "Completed.")
 
 
 def infer_sample(

@@ -60,7 +60,8 @@ def infer(
 
     with open(data_dir, "r", encoding="utf-8") as file:
         data = json.load(file)
-        data = data[resume_index + 1 :]
+        if resume_index != 0:
+            data = data[resume_index + 1 :]
 
     if not lora_dir:
         lora_dir = Path(f"out/lora/{model_name}")
@@ -70,7 +71,8 @@ def infer(
             token=token,
         )
 
-    results = []  # list of dicts
+    data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
+    dataset = Dataset(data_dict)
 
     model, tokenizer, fabric, max_return_token = setup_model(
         lora_path=lora_dir,
@@ -94,13 +96,16 @@ def infer(
             top_k=200,
             temperature=0.8,
         )
-        results.append({"prompt": prompt, "response": response})
+        data_sample = {
+            "id": i,
+            "prompt": prompt,
+            "response": response,
+            "expected_response": sample["output"],
+        }
+        dataset.add_item(data_sample)
         if (i + 1) % 25 == 0:
-            dataset = Dataset.from_dict(results)
             dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
-
             send_embedded_message("Inference", f"Finished {i+1}/{total_samples}.")
-    dataset = Dataset.from_dict(results)
 
     dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
 

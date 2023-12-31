@@ -23,7 +23,7 @@ from lit_gpt.utils import (
 )
 from scripts.prepare_alpaca import generate_prompt
 
-from datasets import Dataset
+from datasets import Dataset, load_dataset
 from huggingface_hub import snapshot_download
 from utils.discord import send_embedded_message
 
@@ -71,8 +71,13 @@ def infer(
             token=token,
         )
 
-    data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
-    dataset = Dataset(data_dict)
+    if resume_index != 0:
+        dataset = load_dataset(
+            f"reinforz/{model_name}-inference", token=token, split="train"
+        )
+    else:
+        data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
+        dataset = Dataset(data_dict)
 
     model, tokenizer, fabric, max_return_token = setup_model(
         lora_path=lora_dir,
@@ -96,13 +101,13 @@ def infer(
             top_k=200,
             temperature=0.8,
         )
-        data_sample = {
+        response_sample = {
             "id": i,
             "prompt": prompt,
             "response": response,
             "expected_response": sample["output"],
         }
-        dataset.add_item(data_sample)
+        dataset.add_item(response_sample)
         if (i + 1) % 25 == 0:
             dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
             send_embedded_message("Inference", f"Finished {i+1}/{total_samples}.")

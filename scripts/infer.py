@@ -112,11 +112,13 @@ def infer(
         dataset = dataset.add_item(response_sample)
         if (i + 1) % 25 == 0:
             dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
-            send_embedded_message("Inference", f"Finished {i+1}/{total_samples}.")
+            send_embedded_message(
+                f"Inference {model_name}", f"Finished {i+1}/{total_samples}."
+            )
 
     dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
 
-    send_embedded_message("Inference", "Completed.", mentionTeam=True)
+    send_embedded_message(f"Inference {model_name}", "Completed.", mentionTeam=True)
 
 
 def infer_sample(

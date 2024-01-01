@@ -74,12 +74,12 @@ def infer(
         )
 
     if resume_index != 0:
-        dataset = load_dataset(
+        dataset: Dataset = load_dataset(
             f"reinforz/{model_name}-inference", token=token, split="train"
         )
     else:
         data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
-        dataset = Dataset.from_dict(data_dict)
+        dataset: Dataset = Dataset.from_dict(data_dict)
 
     model, tokenizer, fabric, max_return_token = setup_model(
         lora_path=Path(f"{lora_dir}/{lora_file}"),
@@ -110,7 +110,7 @@ def infer(
             "expected_response": sample["output"],
         }
         print(response_sample)
-        dataset.add_item(response_sample)
+        dataset = dataset.add_item(response_sample)
         print(dataset)
         break
         if (i + 1) % 25 == 0:

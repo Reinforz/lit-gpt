@@ -65,7 +65,7 @@ def infer(
         if resume_index != 0:
             data = data[resume_index + 1 :]
 
-    lora_dir = Path(f"out/lora/{model_name}/{lora_file}")
+    lora_dir = Path(f"out/lora/{model_name}")
     if not lora_dir.exists():
         snapshot_download(
             repo_id=lora_repo,
@@ -82,7 +82,7 @@ def infer(
         dataset = Dataset.from_dict(data_dict)
 
     model, tokenizer, fabric, max_return_token = setup_model(
-        lora_path=lora_dir,
+        lora_path=Path(f"{lora_dir}/{lora_file}"),
         checkpoint_dir=checkpoint_dir,
         quantize="bnb.nf4",
         max_new_tokens=500,

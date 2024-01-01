@@ -109,10 +109,7 @@ def infer(
             "response": response,
             "expected_response": sample["output"],
         }
-        print(response_sample)
         dataset = dataset.add_item(response_sample)
-        print(dataset)
-        break
         if (i + 1) % 25 == 0:
             dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
             send_embedded_message("Inference", f"Finished {i+1}/{total_samples}.")

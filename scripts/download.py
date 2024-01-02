@@ -15,15 +15,18 @@ _SAFETENSORS_AVAILABLE = RequirementCache("safetensors")
 
 def download_from_hub(
     repo_id: Optional[str] = None,
-    access_token: Optional[str] = os.getenv("HF_TOKEN"),
     from_safetensors: bool = False,
     tokenizer_only: bool = False,
     checkpoint_dir: Path = Path("checkpoints"),
 ) -> None:
+    access_token = os.getenv("HUGGINGFACE_TOKEN")
     if repo_id is None:
         from lit_gpt.config import configs
 
-        options = [f"{config['hf_config']['org']}/{config['hf_config']['name']}" for config in configs]
+        options = [
+            f"{config['hf_config']['org']}/{config['hf_config']['name']}"
+            for config in configs
+        ]
         print("Please specify --repo_id <repo_id>. Available values:")
         print("\n".join(options))
         return
@@ -47,7 +50,9 @@ def download_from_hub(
             # covers `.bin` files and `.bin.index.json`
             download_files.append("*.bin*")
     elif from_safetensors:
-        raise ValueError("`--from_safetensors=True` won't have an effect with `--tokenizer_only=True`")
+        raise ValueError(
+            "`--from_safetensors=True` won't have an effect with `--tokenizer_only=True`"
+        )
 
     directory = checkpoint_dir / repo_id
     snapshot_download(
@@ -70,7 +75,9 @@ def download_from_hub(
             try:
                 result = safetensors_load(safetensor_path)
             except SafetensorError as e:
-                raise RuntimeError(f"{safetensor_path} is likely corrupted. Please try to re-download it.") from e
+                raise RuntimeError(
+                    f"{safetensor_path} is likely corrupted. Please try to re-download it."
+                ) from e
             print(f"{safetensor_path} --> {bin_path}")
             torch.save(result, bin_path)
             os.remove(safetensor_path)

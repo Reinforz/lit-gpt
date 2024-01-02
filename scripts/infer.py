@@ -1,32 +1,27 @@
-import sys
-import os
-import time
-from typing import List, Optional, Literal, Tuple
-from pathlib import Path
 import json
+import os
+import sys
+import time
+from pathlib import Path
+from typing import List, Literal, Optional, Tuple
 
-from jsonargparse import CLI
 import lightning as L
 import torch
+from jsonargparse import CLI
 from lightning.fabric.plugins import BitsandbytesPrecision
 
 wd = Path(__file__).parent.parent.resolve()
 sys.path.append(str(wd))
 
+from datasets import Dataset, load_dataset
+from huggingface_hub import snapshot_download
+
 from generate.base import generate
 from lit_gpt import Tokenizer
 from lit_gpt.lora import GPT, Config, merge_lora_weights
-from lit_gpt.utils import (
-    check_valid_checkpoint_dir,
-    gptq_quantization,
-    lazy_load,
-)
+from lit_gpt.utils import check_valid_checkpoint_dir, gptq_quantization, lazy_load
 from scripts.prepare_alpaca import generate_prompt
-
-from datasets import Dataset, load_dataset
-from huggingface_hub import snapshot_download
 from utils.discord import send_embedded_message
-
 
 lora_r = 8
 lora_alpha = 16
@@ -43,7 +38,6 @@ def infer(
     data_dir: Path = Path("data/test.json"),
     checkpoint_dir: Path = Path("checkpoints/stabilityai/stablelm-base-alpha-3b"),
     lora_repo: str = "reinforz/lora-alpaca",
-    model_name: str = "stablelm-base-alpha-3b",
     lora_file: str = "lit_model_lora_finetuned.pth",
     resume_index: Optional[int] = 0,
 ) -> None:
@@ -55,10 +49,11 @@ def infer(
         lora_file (str): Name of the Lora checkpoint file.
         resume_index (int): Index of the last sample that was processed. Used to resume inference.
         lora_repo (str): Name of the Huggingface repo where the Lora checkpoint is stored.
-        model_name (str): Name of the model to be .
     """
 
     token = os.getenv("HUGGINGFACE_TOKEN")
+
+    model_name = lora_repo.split("/")[1]
 
     with open(data_dir, "r", encoding="utf-8") as file:
         data = json.load(file)
@@ -75,7 +70,7 @@ def infer(
 
     if resume_index != 0:
         dataset: Dataset = load_dataset(
-            f"reinforz/{model_name}-inference", token=token, split="train"
+            f"{lora_repo}-inference", token=token, split="train"
         )
     else:
         data_dict = {"id": [], "prompt": [], "response": [], "expected_response": []}
@@ -111,14 +106,14 @@ def infer(
         }
         dataset = dataset.add_item(response_sample)
         if (i + 1) % 25 == 0:
-            dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
+            dataset.push_to_hub(f"{lora_repo}-inference", token=token)
             send_embedded_message(
-                f"Inference {model_name}", f"Finished {i+1}/{total_samples}."
+                f"Inference {lora_repo}", f"Finished {i+1}/{total_samples}."
             )
 
-    dataset.push_to_hub(f"reinforz/{model_name}-inference", token=token)
+    dataset.push_to_hub(f"reinforz/{lora_repo}-inference", token=token)
 
-    send_embedded_message(f"Inference {model_name}", "Completed.", mentionTeam=True)
+    send_embedded_message(f"Inference {lora_repo}", "Completed.", mentionTeam=True)
 
 
 def infer_sample(

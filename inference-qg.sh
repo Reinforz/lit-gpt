@@ -1,5 +1,5 @@
-base_model_repo="mistralai/Mistral-7B-Instruct-v0.1"
-lora_repo="reinforz/mistral7b-instruct-lora-nf4-qg"
+base_model_repo="tiiuae/falcon-7b"
+lora_repo="reinforz/falcon7b-instruct-lora-nf4-qg"
 lora_file="lit_model_lora_finetuned.pth"
 data_file_url=https://cdn.discordapp.com/attachments/1003310779157725194/1190684270084247622/test.json
 

@@ -5,8 +5,7 @@ data_file_url=https://cdn.discordapp.com/attachments/1003310779157725194/1190684
 
 cd workspace
 
-git clone https://github.com/Reinforz/lit-gpt
-cd lit-gpt
+git clone https://github.com/Reinforz/lit-gpt .
 git pull
 pip install -r requirements-all.txt
 pip uninstall -y torch torchvision torchaudio torchtext

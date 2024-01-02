@@ -111,7 +111,7 @@ def infer(
                 f"Inference {lora_repo}", f"Finished {i+1}/{total_samples}."
             )
 
-    dataset.push_to_hub(f"reinforz/{lora_repo}-inference", token=token)
+    dataset.push_to_hub(f"{lora_repo}-inference", token=token)
 
     send_embedded_message(f"Inference {lora_repo}", "Completed.", mentionTeam=True)
 

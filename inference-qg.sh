@@ -1,6 +1,6 @@
-base_model_repo="tiiuae/falcon-7b"
-lora_repo="reinforz/falcon7b-instruct-lora-nf4-qg"
-lora_file="lit_model_lora_finetuned.pth"
+base_model_repo="meta-llama/Llama-2-7b-hf"
+lora_repo="reinforz/llama7b-instruct-lora-nf4-qg"
+lora_file="step-070-ckpt.pth"
 data_file_url=https://cdn.discordapp.com/attachments/1003310779157725194/1190684270084247622/test.json
 
 cd workspace

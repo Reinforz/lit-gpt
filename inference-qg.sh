@@ -14,7 +14,7 @@ pip install --pre torch --index-url https://download.pytorch.org/whl/nightly/cu1
 
 curl -s $data_file_url -o data.json
 python scripts/download.py \
-  --repo_id $base_model_repo  --access_token $HUGGINGFACE_TOKEN
+  --repo_id $base_model_repo
 
 python scripts/convert_hf_checkpoint.py --checkpoint_dir checkpoints/$base_model_repo
 
